@@ -108,19 +108,21 @@ export const CAPABILITIES = [
  *   measured override (models.dev lists `image`, but an image request 500s).
  */
 const FREE_ID_OVERRIDES = {
-  // models.dev: effort low|high|max; limit 200000/32000 (floor — see above).
+  // models.dev: effort low|high|max; limit 200000/32000.
   'deepseek-v4.1-flash-free': {
-    vision: true, contextWindow: 1048576, maxOutput: 384000,
+    vision: true, contextWindow: 200000, maxOutput: 32000,
     efforts: ['disabled', 'low', 'high', 'max'], effortDefault: 'high',
     effortPatch: { reasoning_effort: '$effort' },
     effortOffPatch: { reasoning_effort: 'none' },
   },
-  // models.dev: effort low|high|max. No `none` in the set, and thinking does
-  // not switch off in practice, so the menu starts at low.
+  // models.dev: effort low|high|max. Limit 200000/32000.
   'glm-5.3-flash-free': {
-    vision: true, contextWindow: 1048576, maxOutput: 131072,
+    vision: true, contextWindow: 200000, maxOutput: 32000,
     efforts: ['low', 'high', 'max'], effortDefault: 'high',
     effortPatch: { reasoning_effort: '$effort' },
+  },
+  'mimo-v2.6-flash-free': {
+    vision: true, contextWindow: 200000, maxOutput: 32000,
   },
   // models.dev: effort none|minimal|low|medium|high|xhigh; 1M window.
   'nemotron-3.5-super-vl-free': {
@@ -166,19 +168,38 @@ const FREE_ID_OVERRIDES = {
   },
   // models.dev: 200000/32000, no reasoning_options. The lane accepted a
   // 265360-token prompt, so the window is the served one.
-  'big-pickle': { vision: true, contextWindow: 262144, maxOutput: 131072 },
+  'big-pickle': { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+  'longcat-2.5-free': { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+  'iceman-free': { vision: false, contextWindow: 1048576, maxOutput: 131072 },
+  'inkling-2-small-free': { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+  'flint-40b-free': { vision: false, contextWindow: 1048576, maxOutput: 131072 },
+  'nemotron-3.5-lightning-free': { vision: false, contextWindow: 1048576, maxOutput: 131072 },
+  'minimax-m3.1-flash-free': {
+    vision: true, contextWindow: 1000000, maxOutput: 512000,
+    efforts: ['low', 'medium', 'high', 'xhigh', 'max'], effortDefault: 'high',
+    effortPatch: { reasoning_effort: '$effort' },
+  },
+  'hy4-flash-free': {
+    vision: true, contextWindow: 1048576, maxOutput: 65536,
+    efforts: ['none', 'high'], effortDefault: 'high',
+    effortPatch: { reasoning_effort: '$effort' },
+  },
 }
 
 /** Human-facing display names, so a raw upstream id never reaches the picker. */
 const DISPLAY_NAMES = {
+  'minimax-m3.1-flash-free': 'MiniMax M3.1 Flash',
   'mimo-v2.6-flash-free': 'MiMo V2.6 Flash',
   'beam-free': 'Beam Free',
   'flint-40b-free': 'Flint 40B Free',
   'pulse-alpha-free': 'Pulse Alpha Free',
-  'crouton-alpha-free': 'Crouton Alpha Free',
   'nemotron-3.5-lightning-free': 'Nemotron 3.5 Lightning',
   'deepseek-v4.1-flash-free': 'DeepSeek V4.1 Flash',
   'glm-5.3-flash-free': 'GLM 5.3 Flash',
+  'longcat-2.5-free': 'LongCat 2.5 Free',
+  'iceman-free': 'Iceman Free',
+  'inkling-2-small-free': 'Inkling 2 Small Free',
+  'hy4-flash-free': 'Hy4 Flash Free',
 }
 
 /** Ids whose regional availability is known to be egress-dependent. The 2.2

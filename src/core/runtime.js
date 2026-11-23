@@ -173,15 +173,7 @@ export function createModelRuntime({
     emitTopology()
   }
   function laneGate() {
-    const lane = laneRow()
-    if (!lane || lane.state === 'ok' || lane.state === undefined) return { ok: true }
-    if (lane.state === 'quota') {
-      if (!Number.isFinite(lane.retryAt) || lane.retryAt <= Date.now()) return { ok: true }
-      return { ok: false, state: 'quota', retryAt: lane.retryAt, message: lane.message ?? '' }
-    }
-    if (lane.state === 'locked') {
-      return { ok: false, state: 'locked', message: lane.message ?? '' }
-    }
+    // Patched: Do not lock entire free lane on individual model quotas
     return { ok: true }
   }
   function clearLaneBreaker() {

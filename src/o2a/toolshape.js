@@ -68,16 +68,28 @@ export function renameAndCompleteTools(payload, shape, { keep } = {}) {
   // The sanitizer's scope: tools the CALLER declared this request — officials
   // we append do not make a body agent-shaped on their own.
   const declaredClientTools = items.filter(item => renamableToolName(shape, item) !== null).length
+  // OpenCode free tier filtration layer: prioritize essential coding tools and cap at 7 tools.
+  const PRIORITY_ORDER = [
+    'terminal', 'execute_code', 'read_file', 'write_file', 'patch',
+    'search_files', 'web_search', 'clarify', 'delegate_task', 'web_extract', 'skill_view'
+  ]
+  items.sort((a, b) => {
+    const na = renamableToolName(shape, a) || ''
+    const nb = renamableToolName(shape, b) || ''
+    const ia = PRIORITY_ORDER.indexOf(na)
+    const ib = PRIORITY_ORDER.indexOf(nb)
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+  })
   const shaped = []
   for (const item of items) {
     const name = renamableToolName(shape, item)
     if (name === null) {
-      shaped.push(item)
+      if (shaped.length < 7) shaped.push(item)
       continue
     }
     // An already-shaped body's officials and wire names are not client tools.
     if (keepNames.has(name) || name.startsWith(CLIENT_TOOL_PREFIX)) {
-      shaped.push(item)
+      if (shaped.length < 7) shaped.push(item)
       continue
     }
     // v1.4.7 `BindOfficial`: a client tool whose folded name is one of an
@@ -88,9 +100,11 @@ export function renameAndCompleteTools(payload, shape, { keep } = {}) {
     // rename map as every other rename.
     const official = officialForClientName(name)
     if (official !== null && officialUsed.has(official) === false && officialToolDefinition(official) !== undefined) {
-      officialUsed.add(official)
-      renames.add(name, official)
-      shaped.push(withToolName(shape, item, official))
+      if (shaped.length < 7) {
+        officialUsed.add(official)
+        renames.add(name, official)
+        shaped.push(withToolName(shape, item, official))
+      }
       continue
     }
     let wireName = renames.wireOf(name)
@@ -98,16 +112,21 @@ export function renameAndCompleteTools(payload, shape, { keep } = {}) {
       wireName = clientToolWireName(name, used)
       renames.add(name, wireName)
     }
-    shaped.push(wireName !== name ? withToolName(shape, item, wireName) : item)
+    // Upstream OpenCode free tier strictly rejects any clint_ tools with FreeUsageLimitError (429).
+    // Drop unmapped tools from wire payload so only valid official tools reach the gate.
+    if (!wireName.startsWith(CLIENT_TOOL_PREFIX) && shaped.length < 7) {
+      shaped.push(wireName !== name ? withToolName(shape, item, wireName) : item)
+    }
   }
   const injected = []
   for (const name of V2_OFFICIAL_TOOL_ORDER) {
+    if (shaped.length >= 7) break
     if (officialUsed.has(name)) continue
     shaped.push(officialTool(shape, name))
     injected.push(name)
     officialUsed.add(name)
   }
-  payload.tools = shaped
+  payload.tools = shaped.slice(0, 7)
   rewriteToolReferences(payload, shape, renames)
   const known = new Set(officialUsed)
   for (const wire of renames.keys()) known.add(wire)

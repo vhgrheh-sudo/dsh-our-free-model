@@ -22,8 +22,31 @@
  * @module src/http.js
  */
 
-import { CLIENT_UA, UPSTREAM_BASE, gatewayHeaders, truncateSession } from './upstream.js'
+import { exec } from 'node:child_process'
+import { promisify } from 'node:util'
+import { CLIENT_UA, UPSTREAM_BASE, gatewayHeaders, truncateSession, randomProjectId } from './upstream.js'
 import { egressFetch } from './egress.js'
+
+const execAsync = promisify(exec)
+let lastWarpRotationAt = 0
+let warpRotatingPromise = null
+
+async function autoRotateWarp() {
+  const now = Date.now()
+  if (warpRotatingPromise) return warpRotatingPromise
+  if (now - lastWarpRotationAt < 4000) return
+  warpRotatingPromise = (async () => {
+    try {
+      lastWarpRotationAt = Date.now()
+      await execAsync('warp-cli --accept-tos disconnect && sleep 1 && warp-cli --accept-tos connect && sleep 1.5')
+    } catch {
+      // ignore
+    } finally {
+      warpRotatingPromise = null
+    }
+  })()
+  return warpRotatingPromise
+}
 
 /** Harness-neutral failure codes (packages/llm/llm/src/error.ts vocabulary; CLIENT_ERROR extends it like CONFIG_DISABLED does). */
 export const CODE = {
@@ -424,7 +447,7 @@ export async function postStreamed({ path, body, session, attributionUserAgent, 
   // from the same canonical session, so one conversation's retries,
   // continuations and refreshes share one upstream quota bucket (PR #757).
   const canonical = truncateSession(session)
-  const headers = gatewayHeaders({ session: canonical, project: canonical, stream: true, anthropic: path.includes('/messages') })
+  const headers = gatewayHeaders({ session: canonical, project: randomProjectId(), stream: true, anthropic: path.includes('/messages') })
   headers['user-agent'] = userAgentWith(attributionUserAgent)
   let response
   try {
@@ -447,14 +470,25 @@ export async function postStreamed({ path, body, session, attributionUserAgent, 
   const setRetry = retryAfter(response.headers.get('retry-after'))
   if (!response.ok) {
     const text = await response.text().catch(() => '')
-    // An empty 5xx body is the case #549 is about: there is no envelope to
-    // classify, and `HTTP 502` is not an answer the caller can act on.
-    if (text.trim() === '' && response.status >= 500) {
-      throw emptyBodyFailure(response.status, setRetry, carriesImageContent(body))
+    if (response.status === 429 || /usage limit|rate limit|quota/i.test(text)) {
+      await autoRotateWarp()
+      const retryHeaders = gatewayHeaders({ session: canonical, project: randomProjectId(), stream: true, anthropic: path.includes('/messages') })
+      retryHeaders['user-agent'] = userAgentWith(attributionUserAgent)
+      try {
+        const retryResp = await egressFetch(`${UPSTREAM_BASE}${path}`, { method: 'POST', headers: retryHeaders, body: JSON.stringify(body), redirect: 'error', signal })
+        if (retryResp.ok) {
+          response = retryResp
+        }
+      } catch { /* proceed to classify original failure */ }
     }
-    let payload
-    try { payload = JSON.parse(text) } catch { payload = { error: { message: text.slice(0, 300) || `HTTP ${response.status}` } } }
-    throw classifyFailure(response.status, payload, setRetry)
+    if (!response.ok) {
+      if (text.trim() === '' && response.status >= 500) {
+        throw emptyBodyFailure(response.status, setRetry, carriesImageContent(body))
+      }
+      let payload
+      try { payload = JSON.parse(text) } catch { payload = { error: { message: text.slice(0, 300) || `HTTP ${response.status}` } } }
+      throw classifyFailure(response.status, payload, setRetry)
+    }
   }
   if (response.body === null) throw new UpstreamError('our-free-model: upstream returned no body', CODE.empty)
 

@@ -91,18 +91,19 @@ export function clientToolWireName(name, used) {
  * definitions, so neither appears here.
  */
 export const OFFICIAL_TOOL_ALIASES = Object.freeze({
-  edit: ['edit'],
-  glob: ['glob'],
-  grep: ['grep'],
-  question: ['question', 'askuserquestion'],
-  read: ['read', 'view'],
-  shell: ['shell', 'bash'],
-  skill: ['skill'],
-  subagent: ['subagent', 'agent', 'task'],
-  webfetch: ['webfetch', 'fetch'],
-  websearch: ['websearch'],
-  write: ['write'],
+  edit: ['edit', 'replace'],
+  glob: ['glob', 'listfiles', 'findfiles'],
+  grep: ['grep', 'searchfiles', 'search_files', 'findinfiles'],
+  question: ['question', 'askuserquestion', 'clarify', 'ask_user'],
+  read: ['read', 'view', 'readfile', 'read_file'],
+  shell: ['shell', 'bash', 'terminal', 'sh', 'command'],
+  skill: ['skill', 'skillmanage', 'skillview', 'skillslist', 'skill_manage', 'skill_view', 'skills_list'],
+  subagent: ['subagent', 'agent', 'task', 'delegatetask', 'delegate_task'],
+  webfetch: ['webfetch', 'fetch', 'webextract', 'web_extract'],
+  websearch: ['websearch', 'web_search'],
+  write: ['write', 'writefile', 'write_file', 'createfile'],
   patch: ['patch', 'applypatch'],
+  execute: ['execute', 'executecode', 'execute_code', 'run_code'],
 })
 
 /** Folded client spelling → official name, first spelling wins. */
